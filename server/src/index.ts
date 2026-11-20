@@ -22,28 +22,23 @@ app.register(fastifystatic, {
 
 // Serve the built frontend (production) - falls back to public for dev
 const DIST_DIR = path.join(__dirname, '../../client/dist');
-if (fs.existsSync(DIST_DIR)) {
+const hasClient = fs.existsSync(path.join(DIST_DIR, 'index.html'));
+if (process.env.NODE_ENV === 'production' && !hasClient) {
+  throw new Error('Missing client/dist/index.html. Run pnpm build before starting the server.');
+}
+if (hasClient) {
   app.register(fastifystatic, {
     root: DIST_DIR,
     prefix: '/',
+    decorateReply: false,
   });
 }
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV !== 'production' && 'dev-secret-change-in-production');
+if (!JWT_SECRET) throw new Error('JWT_SECRET is required in production');
 app.register(fastifyjwt, { secret: JWT_SECRET as string });
 
-// Simple auth check decorator
-declare module '@fastify/jwt' {
-  export interface Fastifyjwt {
-    jwtVerify(request: FastifyRequest, reply?: FastifyReply): Promise<{ parentId: string; iat: number; exp: number }>;
-    jwtSign(payload: object): string;
-  }
-  export interface FastifyRequest {
-    parentId?: string;
-  }
-}
-
-app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply) => {
+async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   try {
     const token = request.headers.authorization?.split(' ')[1];
     if (!token) throw new Error('No token');
@@ -51,10 +46,11 @@ app.decorate('authenticate', async (request: FastifyRequest, reply: FastifyReply
   } catch (err) {
     reply.status(401).send({ error: 'Unauthorized' });
   }
-});
+}
 
 // Root
 app.get('/', async (request, reply) => {
+  if (hasClient) return reply.sendFile('index.html', DIST_DIR);
   return { message: 'BabyBillion Learning API v1.0' };
 });
 
@@ -99,7 +95,7 @@ app.post('/api/login', async (request, reply) => {
 });
 
 // ==================== PROFILES ====================
-app.post('/api/profiles', { preValidation: app.authenticate }, async (request, reply) => {
+app.post('/api/profiles', { preValidation: authenticate }, async (request, reply) => {
   const { nickname, ageGroup, language, avatar, dailyScreenTimeMinutes } = request.body as {
     nickname: string;
     ageGroup: '0-3' | '3-6' | '6-9';
@@ -122,7 +118,7 @@ app.post('/api/profiles', { preValidation: app.authenticate }, async (request, r
   return child;
 });
 
-app.get('/api/profiles', { preValidation: app.authenticate }, async (request, reply) => {
+app.get('/api/profiles', { preValidation: authenticate }, async (request, reply) => {
   const children = await prisma.childProfile.findMany({
     where: { parentId: (request as any).user.parentId },
   });
@@ -199,8 +195,10 @@ app.post('/api/admin/upload', async (request, reply) => {
 
 // SPA fallback: serve index.html for any non-API, non-static route
 app.setNotFoundHandler((request, reply) => {
-  if (fs.existsSync(DIST_DIR) && !request.url.startsWith('/api') && !request.url.startsWith('/public')) {
-    return reply.type('text/html').sendFile('index.html', { root: DIST_DIR });
+  const pathname = request.url.split('?')[0];
+  const isPage = !/^\/(api|public|assets|videos|thumbnails|icons)(\/|$)/.test(pathname) && !path.extname(pathname);
+  if (hasClient && isPage && (request.method === 'GET' || request.method === 'HEAD')) {
+    return reply.type('text/html').sendFile('index.html', DIST_DIR);
   }
   reply.status(404).send({ error: 'Not found' });
 });

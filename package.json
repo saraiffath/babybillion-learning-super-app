@@ -13,5 +13,9 @@
     "db:migrate": "pnpm --filter server db:migrate",
     "db:seed": "pnpm --filter server db:seed",
     "railway-prod": "pnpm build && pnpm start"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": "22.x"
   }
 }

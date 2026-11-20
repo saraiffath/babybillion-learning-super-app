@@ -5,16 +5,21 @@ const prisma = new PrismaClient();
 
 async function main() {
   // Create subscription plans
-  const monthlyPlan = await prisma.subscriptionPlan.create({
-    data: { name: 'Monthly Premium', price: 199, currency: 'INR', durationDays: 30 },
+  const monthlyPlan = await prisma.subscriptionPlan.upsert({
+    where: { id: 'seed-monthly' },
+    update: {},
+    create: { id: 'seed-monthly', name: 'Monthly Premium', price: 199, currency: 'INR', durationDays: 30 },
   });
 
-  const annualPlan = await prisma.subscriptionPlan.create({
-    data: { name: 'Annual Premium', price: 1999, currency: 'INR', durationDays: 365 },
+  await prisma.subscriptionPlan.upsert({
+    where: { id: 'seed-annual' },
+    update: {},
+    create: { id: 'seed-annual', name: 'Annual Premium', price: 1999, currency: 'INR', durationDays: 365 },
   });
 
   // Create categories
-  const categories = await prisma.category.createMany({
+  await prisma.category.createMany({
+    skipDuplicates: true,
     data: [
       { name: 'English Alphabet', slug: 'alphabet', description: 'ABC, phonics, vocabulary', ageGroup: '0-3', icon: '📘', order: 1 },
       { name: 'Counting Numbers', slug: 'counting', description: 'Numbers, counting, addition, subtraction', ageGroup: '0-3', icon: '🔢', order: 2 },
@@ -45,8 +50,12 @@ async function main() {
 
   for (const v of videoTemplates) {
     if (v.categoryId) {
-      await prisma.videoLesson.create({
-        data: {
+      const id = `seed-video-${v.title.toLowerCase().replace(/\s+/g, '-')}`;
+      await prisma.videoLesson.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
           categoryId: v.categoryId,
           title: v.title,
           description: v.description,
@@ -71,8 +80,12 @@ async function main() {
       { title: 'Sheru Bhai Buys King Ka TAJ', description: 'Sheru Bhai buys the King Ka TAJ!', videoUrl: '/videos/sheru-bhai-king-taj.mp4', durationSeconds: 100, ageGroup: '3-6', isPremium: false },
     ];
     for (const v of sheruVideos) {
-      await prisma.videoLesson.create({
-        data: {
+      const id = `seed-video-${v.videoUrl.split('/').pop()}`;
+      await prisma.videoLesson.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
           categoryId: sheruCategory.id,
           title: v.title,
           description: v.description,
@@ -86,6 +99,8 @@ async function main() {
     }
     console.log(`Seeded ${sheruVideos.length} Sheru Bhai videos`);
   }
+
+  if (process.env.NODE_ENV === 'production') return;
 
   // Seed parent account with password 'parent123' and PIN '1234'
   const parentPassword = await bcrypt.hash('parent123', 10);
