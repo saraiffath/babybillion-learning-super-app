@@ -1,0 +1,17 @@
+{
+  "name": "babybillion-learning-super-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BabyBillion Kids Learning Super App PWA",
+  "scripts": {
+    "dev:server": "pnpm --filter server dev",
+    "dev:client": "pnpm --filter client dev",
+    "build:server": "pnpm --filter server build",
+    "build:client": "pnpm --filter client build",
+    "build": "pnpm --filter server build && pnpm --filter client build",
+    "start": "pnpm --filter server start",
+    "db:migrate": "pnpm --filter server db:migrate",
+    "db:seed": "pnpm --filter server db:seed",
+    "railway-prod": "pnpm build && pnpm start"
+  }
+}

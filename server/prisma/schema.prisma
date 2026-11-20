@@ -1,0 +1,141 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Parent {
+  id             String          @id @default(uuid())
+  email          String          @unique
+  passwordHash   String
+  name           String
+  isVerified     Boolean         @default(true)
+  pinHash        String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  children       ChildProfile[]
+  subscriptions  Subscription[]
+}
+
+model ChildProfile {
+  id                    String            @id @default(uuid())
+  parentId              String
+  parent                Parent            @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  nickname              String
+  ageGroup              String            // '0-3', '3-6', '6-9'
+  language              String            @default("en") // 'en', 'hi'
+  avatar                String            @default("bear")
+  dailyScreenTimeMinutes Int              @default(60)
+  todayScreenTimeUsed   Int               @default(0)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  watchHistory          WatchHistory[]
+  favorites             Favorite[]
+  gameResults           GameResult[]
+}
+
+model Category {
+  id          String        @id @default(uuid())
+  name        String
+  slug        String        @unique
+  description String
+  icon        String
+  ageGroup    String        // '0-3', '3-6', '6-9', 'all'
+  isPremium   Boolean       @default(false)
+  order       Int           @default(0)
+  videos      VideoLesson[]
+  createdAt   DateTime      @default(now())
+}
+
+model VideoLesson {
+  id             String         @id @default(uuid())
+  categoryId     String
+  category       Category       @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  title          String
+  description    String
+  durationSeconds Int           @default(180)
+  videoUrl       String
+  thumbnailUrl   String
+  isPremium      Boolean        @default(false)
+  ageGroup       String         @default("3-6")
+  createdAt      DateTime       @default(now())
+  watchHistory   WatchHistory[]
+  favorites      Favorite[]
+}
+
+model Game {
+  id           String       @id @default(uuid())
+  slug         String       @unique
+  title        String
+  description  String
+  category     String
+  minAge       Int          @default(3)
+  maxAge       Int          @default(8)
+  thumbnailUrl String
+  results      GameResult[]
+}
+
+model WatchHistory {
+  id              String       @id @default(uuid())
+  childId         String
+  child           ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  videoId         String
+  video           VideoLesson  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  progressSeconds Int          @default(0)
+  completed       Boolean      @default(false)
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([childId, videoId])
+}
+
+model Favorite {
+  id      String       @id @default(uuid())
+  childId String
+  child   ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  videoId String
+  video   VideoLesson  @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, videoId])
+}
+
+model GameResult {
+  id                String       @id @default(uuid())
+  childId           String
+  child             ChildProfile @relation(fields: [childId], references: [id], onDelete: Cascade)
+  gameId            String
+  game              Game         @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  score             Int          @default(0)
+  maxScore          Int          @default(10)
+  completed         Boolean      @default(true)
+  timeSpentSeconds  Int          @default(60)
+  createdAt         DateTime     @default(now())
+}
+
+model SubscriptionPlan {
+  id            String         @id @default(uuid())
+  name          String
+  price         Float
+  currency      String         @default("INR")
+  durationDays  Int            @default(30)
+  subscriptions Subscription[]
+}
+
+model Subscription {
+  id        String           @id @default(uuid())
+  parentId  String
+  parent    Parent           @relation(fields: [parentId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      SubscriptionPlan @relation(fields: [planId], references: [id])
+  startDate DateTime         @default(now())
+  endDate   DateTime
+  status    String           @default("active") // active, expired, cancelled
+}
+
+model Admin {
+  id       String @id @default(uuid())
+  username String @unique
+  password String
+}
